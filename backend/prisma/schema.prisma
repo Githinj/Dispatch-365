@@ -82,6 +82,13 @@ enum SubscriptionPlan {
   ENTERPRISE
 }
 
+enum PaymentMethod {
+  BANK_TRANSFER
+  CHEQUE
+  CASH
+  OTHER
+}
+
 enum VehicleStatus {
   AVAILABLE
   ON_LOAD
@@ -150,7 +157,6 @@ model User {
   createdLoads    Load[]      @relation("CreatedByDispatcher")
   assignedLoads   Load[]      @relation("AssignedToDriver")
   auditLogs       AuditLog[]
-  invoicesCreated Invoice[]
 
   // Dispatcher relations
   dispatcherStats         DispatcherStats?
@@ -165,6 +171,8 @@ model User {
   driverFleetHistory  DriverFleetHistory[]
   driverTransferRequests DriverTransferRequest[] @relation("DriverTransferUser")
   driverJoinRequests  DriverJoinRequest[]     @relation("DriverJoinUser")
+
+  notifications Notification[]
 
   @@index([agencyId])
   @@index([fleetId])
@@ -194,6 +202,7 @@ model Agency {
   loads             Load[]
   agencyFleets      AgencyFleet[]
   invoices          Invoice[]
+  receipts          Receipt[]
   fleetInvites      FleetInvite[]
 
   // Dispatcher relations
@@ -233,6 +242,8 @@ model Fleet {
   vehicles           Vehicle[]
   agencyFleets       AgencyFleet[]
   loads              Load[]
+  invoices           Invoice[]
+  receipts           Receipt[]
   fleetInvites       FleetInvite[]
 
   // Driver relations
@@ -382,7 +393,7 @@ model Load {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  invoices      Invoice[]
+  invoice       Invoice?
   statusHistory LoadStatusHistory[]
 
   @@index([agencyId])
@@ -409,29 +420,100 @@ model LoadStatusHistory {
 }
 
 model Invoice {
-  id     String        @id @default(uuid())
-  status InvoiceStatus @default(UNPAID)
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique
+  status        InvoiceStatus @default(UNPAID)
 
+  // Relations
+  loadId   String @unique   // one invoice per load
+  load     Load   @relation(fields: [loadId], references: [id])
   agencyId String
   agency   Agency @relation(fields: [agencyId], references: [id])
+  fleetId  String
+  fleet    Fleet  @relation(fields: [fleetId], references: [id])
 
-  loadId String
-  load   Load   @relation(fields: [loadId], references: [id])
+  // Financial snapshot (copied from load at generation time — never recalculated)
+  loadRate           Float
+  commissionPercent  Float  @default(0)
+  commissionAmount   Float  @default(0)
+  dispatcherEarnings Float  @default(0)
+  fleetEarnings      Float
 
-  createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id])
-
-  amount      Float
+  // Dates
+  generatedAt DateTime @default(now())
   dueDate     DateTime
-  paidAt      DateTime?
-  paidAmount  Float?
+
+  // Payment
+  paidAt              DateTime?
+  paidAmount          Float?
+  paymentMethod       PaymentMethod?
+  paymentReference    String?
+  paymentNotes        String?
+  paymentDate         DateTime?
+  paymentRecordedById String?
+
+  // Dispute
+  isDisputed        Boolean   @default(false)
+  disputeReason     String?
+  disputeRaisedAt   DateTime?
+  disputeRaisedById String?
+  disputeResolvedAt DateTime?
+
+  // PDF cache
+  pdfUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  receipt Receipt?
+
   @@index([agencyId])
-  @@index([loadId])
+  @@index([fleetId])
   @@index([status])
+  @@index([dueDate])
+}
+
+model Receipt {
+  id            String @id @default(uuid())
+  receiptNumber String @unique
+
+  invoiceId String  @unique
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+
+  // Immutable snapshot — captured at generation time, never updated
+  loadId     String
+  agencyId   String
+  agency     Agency @relation(fields: [agencyId], references: [id])
+  agencyName String
+  fleetId    String
+  fleet      Fleet  @relation(fields: [fleetId], references: [id])
+  fleetName  String
+  driverName String?
+  route      String         // "origin → destination"
+  deliveryDate DateTime?
+
+  // Financial snapshot
+  loadRate           Float
+  commissionPercent  Float
+  commissionAmount   Float
+  dispatcherEarnings Float
+  fleetEarnings      Float
+
+  // Payment details
+  amountPaid       Float
+  paymentMethod    PaymentMethod
+  paymentReference String?
+  paymentDate      DateTime
+  recordedById     String
+  recordedByName   String
+
+  // PDF cache
+  pdfUrl String?
+
+  generatedAt DateTime @default(now())
+
+  @@index([agencyId])
+  @@index([fleetId])
 }
 
 model AuditLog {
@@ -620,4 +702,26 @@ model DriverJoinRequest {
   @@index([driverId])
   @@index([fleetId])
   @@index([status])
+}
+
+// ── Notification model ──────────────────────────────────────────────
+
+model Notification {
+  id      String  @id @default(uuid())
+  userId  String
+  user    User    @relation(fields: [userId], references: [id])
+
+  type    String          // e.g. LOAD_ASSIGNED, INVOICE_OVERDUE, TRANSFER_REQUESTED
+  title   String
+  message String
+  data    String?         // JSON payload for deep linking
+
+  isRead  Boolean @default(false)
+  readAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt])
 }

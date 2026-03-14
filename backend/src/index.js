@@ -21,6 +21,7 @@ const dispatcherRoutes = require("./routes/dispatcher/dispatcher.routes");
 const driverRoutes = require("./routes/driver/driver.routes");
 const vehicleRoutes = require("./routes/vehicle/vehicle.routes");
 const loadRoutes = require("./routes/load/load.routes");
+const notificationRoutes = require("./routes/notification/notification.routes");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -56,6 +57,7 @@ app.use("/api/dispatchers", dispatcherRoutes);
 app.use("/api/drivers", driverRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/loads", loadRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // ── Global error handler (must be last) ──────────────────────────────
 app.use(globalErrorHandler);
