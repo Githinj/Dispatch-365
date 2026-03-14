@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const request = require("supertest");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const app = require("../src/index");
 const { prisma } = require("../src/services/prisma.service");
 const { redis } = require("../src/services/redis.service");
