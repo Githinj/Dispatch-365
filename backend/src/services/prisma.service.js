@@ -1,6 +1,8 @@
 const { PrismaClient } = require("@prisma/client");
 
+// Prisma v7 requires datasourceUrl to be passed to constructor
 const prisma = new PrismaClient({
+  datasourceUrl: process.env.DATABASE_URL,
   log: process.env.NODE_ENV === "development" ? ["query", "warn", "error"] : ["error"],
 });
 
