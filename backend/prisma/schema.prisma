@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ────────────────────────────────────────────────────────────
+
+enum Role {
+  SuperAdmin
+  AgencyAdmin
+  Dispatcher
+  FleetAdmin
+  Driver
+}
+
+enum LoadStatus {
+  DRAFT
+  ASSIGNED
+  IN_TRANSIT
+  PENDING_DELIVERY_CONFIRMATION
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum DispatcherStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED_TRANSFER
+  SUSPENDED_RESTORATION
+  INACTIVE
+}
+
+enum DriverStatus {
+  PENDING
+  ACTIVE
+  ON_LOAD
+  SUSPENDED_TRANSFER
+  SUSPENDED_RESTORATION
+  INACTIVE
+}
+
+enum FleetStatus {
+  INVITED
+  PENDING
+  ACTIVE
+  REJECTED
+  SUSPENDED
+  INACTIVE
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  DISPUTED
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+// ── Models ───────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  phone     String?
+  role      Role
+  isActive  Boolean  @default(true)
+
+  agencyId String?
+  agency   Agency? @relation(fields: [agencyId], references: [id])
+
+  fleetId String?
+  fleet   Fleet?  @relation(fields: [fleetId], references: [id])
+
+  // Dispatcher-specific
+  dispatcherStatus DispatcherStatus?
+
+  // Driver-specific
+  driverStatus DriverStatus?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdLoads    Load[]      @relation("CreatedByDispatcher")
+  assignedLoads   Load[]      @relation("AssignedToDriver")
+  auditLogs       AuditLog[]
+  invoicesCreated Invoice[]
+
+  @@index([agencyId])
+  @@index([fleetId])
+  @@index([role])
+}
+
+model Agency {
+  id   String @id @default(uuid())
+  name String @unique
+
+  // Branding
+  logoUrl        String?
+  primaryColor   String?  @default("#1a1a2e")
+  secondaryColor String?  @default("#16213e")
+  footerText     String?
+
+  // Business
+  commissionPercent Float            @default(10)
+  paymentTermsDays  Int              @default(30)
+  subscriptionPlan  SubscriptionPlan @default(FREE)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  loads             Load[]
+  agencyFleets      AgencyFleet[]
+  invoices          Invoice[]
+}
+
+model Fleet {
+  id   String @id @default(uuid())
+  name String @unique
+
+  status    FleetStatus @default(PENDING)
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  users        User[]
+  vehicles     Vehicle[]
+  agencyFleets AgencyFleet[]
+  loads        Load[]
+}
+
+/// Junction table — an agency can work with many fleets, each with its own commission.
+model AgencyFleet {
+  id               String @id @default(uuid())
+  agencyId         String
+  fleetId          String
+  commissionPercent Float  @default(10)
+
+  agency Agency @relation(fields: [agencyId], references: [id])
+  fleet  Fleet  @relation(fields: [fleetId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([agencyId, fleetId])
+}
+
+model Vehicle {
+  id              String  @id @default(uuid())
+  fleetId         String
+  fleet           Fleet   @relation(fields: [fleetId], references: [id])
+  make            String
+  model           String
+  year            Int
+  licensePlate    String  @unique
+  vin             String? @unique
+  isUnderMaintenance Boolean @default(false)
+  isActive        Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  loads Load[]
+
+  @@index([fleetId])
+}
+
+model Load {
+  id       String     @id @default(uuid())
+  status   LoadStatus @default(DRAFT)
+
+  // Relationships
+  agencyId     String
+  agency       Agency @relation(fields: [agencyId], references: [id])
+
+  dispatcherId String
+  dispatcher   User   @relation("CreatedByDispatcher", fields: [dispatcherId], references: [id])
+
+  fleetId  String?
+  fleet    Fleet?  @relation(fields: [fleetId], references: [id])
+
+  driverId String?
+  driver   User?   @relation("AssignedToDriver", fields: [driverId], references: [id])
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  // Load details
+  origin        String
+  destination   String
+  pickupDate    DateTime?
+  deliveryDate  DateTime?
+  commodity     String?
+  weight        Float?
+  notes         String?
+
+  // Financial
+  loadRate          Float?
+  commissionPercent Float?
+  commissionAmount  Float?
+  dispatcherEarnings Float?
+  fleetEarnings     Float?
+  platformRevenue   Float?
+
+  // POD
+  podUrl String?
+
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  invoices Invoice[]
+
+  @@index([agencyId])
+  @@index([dispatcherId])
+  @@index([fleetId])
+  @@index([driverId])
+  @@index([status])
+}
+
+model Invoice {
+  id     String        @id @default(uuid())
+  status InvoiceStatus @default(UNPAID)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  loadId String
+  load   Load   @relation(fields: [loadId], references: [id])
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  amount      Float
+  dueDate     DateTime
+  paidAt      DateTime?
+  paidAmount  Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([loadId])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
+  statusCode Int?
+  ip         String?
+  payload    String?
+
+  // Rich audit fields
+  entityType String?
+  entityId   String?
+  oldValue   String?
+  newValue   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([resource])
+  @@index([createdAt])
+}

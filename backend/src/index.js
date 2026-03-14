@@ -14,6 +14,7 @@ const { audit } = require("./middleware/audit.middleware");
 const { globalErrorHandler } = require("./middleware/error.middleware");
 
 const authRoutes = require("./routes/auth/auth.routes");
+const agencyRoutes = require("./routes/agency/agency.routes");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -40,7 +41,7 @@ app.use("/api", stripFinancialFields);
 app.use("/api", audit);
 
 // ── Protected routes (register below this line) ──────────────────────
-// e.g. app.use("/api/loads", loadRoutes);
+app.use("/api/agencies", agencyRoutes);
 
 // ── Global error handler (must be last) ──────────────────────────────
 app.use(globalErrorHandler);
@@ -64,6 +65,9 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
-start();
+// Only auto-start when run directly (not when imported by tests)
+if (require.main === module) {
+  start();
+}
 
 module.exports = app;
