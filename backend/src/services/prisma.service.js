@@ -1,8 +1,8 @@
 const { PrismaClient } = require("@prisma/client");
 
-// Prisma v7 requires datasourceUrl to be passed to constructor
+// Prisma v7 configuration
+// Connection URL will be read from DATABASE_URL environment variable via prisma.config.ts
 const prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL,
   log: process.env.NODE_ENV === "development" ? ["query", "warn", "error"] : ["error"],
 });
 
