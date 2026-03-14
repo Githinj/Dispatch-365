@@ -1,5 +1,6 @@
 require("dotenv").config();
 
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -19,6 +20,7 @@ const fleetRoutes = require("./routes/fleet/fleet.routes");
 const dispatcherRoutes = require("./routes/dispatcher/dispatcher.routes");
 const driverRoutes = require("./routes/driver/driver.routes");
 const vehicleRoutes = require("./routes/vehicle/vehicle.routes");
+const loadRoutes = require("./routes/load/load.routes");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -28,6 +30,9 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(morgan("short"));
+
+// ── Static files (POD uploads — dev only; use S3/R2 in production) ───
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // ── Public routes (no auth required) ─────────────────────────────────
 app.use("/api/auth", authRoutes);
@@ -50,6 +55,7 @@ app.use("/api/fleets", fleetRoutes);
 app.use("/api/dispatchers", dispatcherRoutes);
 app.use("/api/drivers", driverRoutes);
 app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/loads", loadRoutes);
 
 // ── Global error handler (must be last) ──────────────────────────────
 app.use(globalErrorHandler);

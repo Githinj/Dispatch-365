@@ -367,16 +367,44 @@ model Load {
   // POD
   podUrl String?
 
+  // Lifecycle timestamps
+  loadNumber              String?   @unique
+  tripStartedAt           DateTime?
+  deliverySubmittedAt     DateTime?
+  deliveryAcceptedAt      DateTime?
+  deliveryRejectedAt      DateTime?
+  deliveryRejectionReason String?
+  cancelledAt             DateTime?
+  cancelledById           String?
+  cancellationReason      String?
+
   completedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  invoices Invoice[]
+  invoices      Invoice[]
+  statusHistory LoadStatusHistory[]
 
   @@index([agencyId])
   @@index([dispatcherId])
   @@index([fleetId])
   @@index([driverId])
+  @@index([status])
+  @@index([loadNumber])
+}
+
+model LoadStatusHistory {
+  id            String     @id @default(uuid())
+  loadId        String
+  load          Load       @relation(fields: [loadId], references: [id])
+  status        LoadStatus
+  changedById   String?
+  changedByRole Role?
+  reason        String?
+
+  createdAt DateTime @default(now())
+
+  @@index([loadId])
   @@index([status])
 }
 

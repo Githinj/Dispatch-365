@@ -1,3 +1,5 @@
 node_modules/
 .env
 *.rdb
+backend/uploads/*
+!backend/uploads/.gitkeep
