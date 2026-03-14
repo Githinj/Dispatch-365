@@ -6,6 +6,13 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 
+// Initialize Prisma client before attempting to import it
+const { ensurePrismaClientGenerated } = require("./services/prisma-init");
+if (!ensurePrismaClientGenerated()) {
+  console.error("[Server] Failed to initialize Prisma client");
+  process.exit(1);
+}
+
 const { connectDatabase, disconnectDatabase } = require("./services/prisma.service");
 const { redis } = require("./services/redis.service");
 const { authenticate } = require("./middleware/auth.middleware");

@@ -4,6 +4,7 @@
   "description": "Dispatch-365 logistics platform backend",
   "main": "src/index.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "prisma:generate": "prisma generate",
