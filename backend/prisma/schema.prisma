@@ -135,21 +135,55 @@ model Agency {
   loads             Load[]
   agencyFleets      AgencyFleet[]
   invoices          Invoice[]
+  fleetInvites      FleetInvite[]
 }
 
 model Fleet {
   id   String @id @default(uuid())
   name String @unique
 
-  status    FleetStatus @default(PENDING)
+  status    FleetStatus @default(INVITED)
   isActive  Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+
+  // Contact
+  contactEmail String?
+  contactPhone String?
+
+  // Registration documents
+  businessRegistrationUrl String?
+  operatingLicenseUrl     String?
+  operatingLicenseExpiry  DateTime?
+  insuranceCertificateUrl String?
+  insuranceCertificateExpiry DateTime?
+
+  // Invite / registration flow
+  inviteToken    String?  @unique
+  invitedByAgencyId String?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   users        User[]
   vehicles     Vehicle[]
   agencyFleets AgencyFleet[]
   loads        Load[]
+  fleetInvites FleetInvite[]
+}
+
+/// Tracks every agency that has invited a given fleet.
+/// On SuperAdmin approval, AgencyFleet records are auto-created for each invite.
+model FleetInvite {
+  id       String @id @default(uuid())
+  fleetId  String
+  fleet    Fleet  @relation(fields: [fleetId], references: [id])
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([fleetId, agencyId])
+  @@index([fleetId])
 }
 
 /// Junction table — an agency can work with many fleets, each with its own commission.

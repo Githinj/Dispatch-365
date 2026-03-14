@@ -71,6 +71,13 @@ async function isAccountLocked(identifier) {
   return val === "1";
 }
 
+/** Destroy sessions for an array of user IDs in parallel. */
+async function invalidateMultipleUsers(userIds) {
+  if (!userIds.length) return;
+  const keys = userIds.map((id) => `${SESSION_PREFIX}${id}`);
+  return redis.del(...keys);
+}
+
 module.exports = {
   redis,
   createSession,
@@ -82,4 +89,5 @@ module.exports = {
   resetLoginAttempts,
   lockAccount,
   isAccountLocked,
+  invalidateMultipleUsers,
 };

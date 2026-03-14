@@ -1,5 +1,5 @@
 const { prisma } = require("./prisma.service");
-const { destroySession } = require("./redis.service");
+const { invalidateMultipleUsers } = require("./redis.service");
 
 // ── Create agency (SuperAdmin only) ──────────────────────────────────
 
@@ -62,9 +62,7 @@ async function suspendAgency(id) {
   });
 
   // Invalidate all sessions for every user in this agency
-  await Promise.all(
-    agency.users.map((user) => destroySession(user.id))
-  );
+  await invalidateMultipleUsers(agency.users.map((u) => u.id));
 
   return updated;
 }
