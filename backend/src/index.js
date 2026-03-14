@@ -16,6 +16,8 @@ const { globalErrorHandler } = require("./middleware/error.middleware");
 const authRoutes = require("./routes/auth/auth.routes");
 const agencyRoutes = require("./routes/agency/agency.routes");
 const fleetRoutes = require("./routes/fleet/fleet.routes");
+const dispatcherRoutes = require("./routes/dispatcher/dispatcher.routes");
+const driverRoutes = require("./routes/driver/driver.routes");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -44,6 +46,8 @@ app.use("/api", audit);
 // ── Protected routes (register below this line) ──────────────────────
 app.use("/api/agencies", agencyRoutes);
 app.use("/api/fleets", fleetRoutes);
+app.use("/api/dispatchers", dispatcherRoutes);
+app.use("/api/drivers", driverRoutes);
 
 // ── Global error handler (must be last) ──────────────────────────────
 app.use(globalErrorHandler);

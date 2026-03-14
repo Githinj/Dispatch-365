@@ -63,9 +63,16 @@ enum InvoiceStatus {
 
 enum TransferStatus {
   PENDING
+  PARTIAL
   APPROVED
-  REJECTED
+  DECLINED
   CANCELLED
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
 }
 
 enum SubscriptionPlan {
@@ -95,9 +102,19 @@ model User {
 
   // Dispatcher-specific
   dispatcherStatus DispatcherStatus?
+  inviteToken      String?           @unique
 
   // Driver-specific
-  driverStatus DriverStatus?
+  driverStatus            DriverStatus?
+  profilePhotoUrl         String?
+  licenseNumber           String?
+  licenseUrl              String?
+  licenseExpiry           DateTime?
+  licenseIsExpired        Boolean   @default(false)
+  medicalCertificateUrl   String?
+  hazmatCertificationUrl  String?
+  backgroundCheckUrl      String?
+  rejectionReason         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -106,6 +123,20 @@ model User {
   assignedLoads   Load[]      @relation("AssignedToDriver")
   auditLogs       AuditLog[]
   invoicesCreated Invoice[]
+
+  // Dispatcher relations
+  dispatcherStats         DispatcherStats?
+  dispatcherAgencyHistory DispatcherAgencyHistory[]
+  transferRequestsFrom    DispatcherTransferRequest[] @relation("TransferDispatcher")
+  joinRequestsSent        DispatcherJoinRequest[]     @relation("JoinRequester")
+  ratingsReceived         DispatcherRating[]          @relation("RatedDispatcher")
+  ratingsGiven            DispatcherRating[]          @relation("RatingAuthor")
+
+  // Driver relations
+  driverStats         DriverStats?
+  driverFleetHistory  DriverFleetHistory[]
+  driverTransferRequests DriverTransferRequest[] @relation("DriverTransferUser")
+  driverJoinRequests  DriverJoinRequest[]     @relation("DriverJoinUser")
 
   @@index([agencyId])
   @@index([fleetId])
@@ -136,6 +167,12 @@ model Agency {
   agencyFleets      AgencyFleet[]
   invoices          Invoice[]
   fleetInvites      FleetInvite[]
+
+  // Dispatcher relations
+  dispatcherHistory     DispatcherAgencyHistory[]
+  transferRequestsFrom  DispatcherTransferRequest[] @relation("TransferFromAgency")
+  transferRequestsTo    DispatcherTransferRequest[] @relation("TransferToAgency")
+  joinRequestsReceived  DispatcherJoinRequest[]     @relation("JoinTargetAgency")
 }
 
 model Fleet {
@@ -169,6 +206,12 @@ model Fleet {
   agencyFleets AgencyFleet[]
   loads        Load[]
   fleetInvites FleetInvite[]
+
+  // Driver relations
+  driverTransferRequestsFrom DriverTransferRequest[] @relation("DriverTransferFromFleet")
+  driverTransferRequestsTo   DriverTransferRequest[] @relation("DriverTransferToFleet")
+  driverJoinRequestsReceived DriverJoinRequest[]     @relation("DriverJoinTargetFleet")
+  driverFleetHistory         DriverFleetHistory[]
 }
 
 /// Tracks every agency that has invited a given fleet.
@@ -321,4 +364,169 @@ model AuditLog {
   @@index([userId])
   @@index([resource])
   @@index([createdAt])
+}
+
+// ── Dispatcher module models ─────────────────────────────────────────
+
+model DispatcherStats {
+  id           String @id @default(uuid())
+  dispatcherId String @unique
+  dispatcher   User   @relation(fields: [dispatcherId], references: [id])
+
+  totalLoadsCreated   Int   @default(0)
+  totalLoadsCompleted Int   @default(0)
+  totalLoadsCancelled Int   @default(0)
+  completionRate      Float @default(0)
+  onTimeDeliveryRate  Float @default(0)
+  podAcceptanceRate   Float @default(0)
+  disputeRate         Float @default(0)
+  autoScore           Float @default(0)
+  adminRatingAverage  Float @default(0)
+  overallRating       Float @default(0)
+
+  updatedAt DateTime @updatedAt
+}
+
+model DispatcherAgencyHistory {
+  id           String    @id @default(uuid())
+  dispatcherId String
+  dispatcher   User      @relation(fields: [dispatcherId], references: [id])
+  agencyId     String
+  agency       Agency    @relation(fields: [agencyId], references: [id])
+  startDate    DateTime  @default(now())
+  endDate      DateTime?
+
+  @@index([dispatcherId])
+  @@index([agencyId])
+}
+
+model DispatcherTransferRequest {
+  id           String         @id @default(uuid())
+  dispatcherId String
+  dispatcher   User           @relation("TransferDispatcher", fields: [dispatcherId], references: [id])
+
+  fromAgencyId String
+  fromAgency   Agency         @relation("TransferFromAgency", fields: [fromAgencyId], references: [id])
+  toAgencyId   String
+  toAgency     Agency         @relation("TransferToAgency", fields: [toAgencyId], references: [id])
+
+  status              TransferStatus @default(PENDING)
+  fromAgencyApproved  Boolean?
+  toAgencyApproved    Boolean?
+  declineReason       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dispatcherId])
+  @@index([status])
+}
+
+model DispatcherJoinRequest {
+  id           String           @id @default(uuid())
+  dispatcherId String
+  dispatcher   User             @relation("JoinRequester", fields: [dispatcherId], references: [id])
+  agencyId     String
+  agency       Agency           @relation("JoinTargetAgency", fields: [agencyId], references: [id])
+
+  status         JoinRequestStatus @default(PENDING)
+  declineReason  String?
+  cooldownUntil  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dispatcherId])
+  @@index([agencyId])
+  @@index([status])
+}
+
+model DispatcherRating {
+  id           String @id @default(uuid())
+  dispatcherId String
+  dispatcher   User   @relation("RatedDispatcher", fields: [dispatcherId], references: [id])
+  authorId     String
+  author       User   @relation("RatingAuthor", fields: [authorId], references: [id])
+
+  score      Int      // 1-5
+  comment    String?
+  response   String?  // Dispatcher's response to the rating
+  isFlagged  Boolean  @default(false)
+  flagReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dispatcherId])
+}
+
+// ── Driver module models ─────────────────────────────────────────────
+
+model DriverStats {
+  id       String @id @default(uuid())
+  driverId String @unique
+  driver   User   @relation(fields: [driverId], references: [id])
+
+  totalLoadsCompleted Int   @default(0)
+  onTimeDeliveryRate  Float @default(0)
+  podAcceptanceRate   Float @default(0)
+  disputeRate         Float @default(0)
+  overallRating       Float @default(0)
+
+  updatedAt DateTime @updatedAt
+}
+
+model DriverFleetHistory {
+  id        String    @id @default(uuid())
+  driverId  String
+  driver    User      @relation(fields: [driverId], references: [id])
+  fleetId   String
+  fleet     Fleet     @relation(fields: [fleetId], references: [id])
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+
+  @@index([driverId])
+  @@index([fleetId])
+}
+
+model DriverTransferRequest {
+  id       String @id @default(uuid())
+  driverId String
+  driver   User   @relation("DriverTransferUser", fields: [driverId], references: [id])
+
+  fromFleetId String
+  fromFleet   Fleet  @relation("DriverTransferFromFleet", fields: [fromFleetId], references: [id])
+  toFleetId   String
+  toFleet     Fleet  @relation("DriverTransferToFleet", fields: [toFleetId], references: [id])
+
+  status            TransferStatus @default(PENDING)
+  fromFleetApproved Boolean?
+  toFleetApproved   Boolean?
+  declineReason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId])
+  @@index([status])
+}
+
+model DriverJoinRequest {
+  id       String @id @default(uuid())
+  driverId String
+  driver   User   @relation("DriverJoinUser", fields: [driverId], references: [id])
+  fleetId  String
+  fleet    Fleet  @relation("DriverJoinTargetFleet", fields: [fleetId], references: [id])
+
+  status          JoinRequestStatus @default(PENDING)
+  declineReason   String?
+  reasonForLeaving String?
+  cooldownUntil   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([driverId])
+  @@index([fleetId])
+  @@index([status])
 }
