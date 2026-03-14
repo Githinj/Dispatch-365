@@ -199,10 +199,11 @@ model Agency {
   subscriptionPlan  SubscriptionPlan @default(FREE)
 
   // Subscription lifecycle
-  subscriptionStartDate DateTime?
-  subscriptionEndDate   DateTime?
-  suspendedAt           DateTime?
-  suspendedReason       String?
+  subscriptionStartDate   DateTime?
+  subscriptionEndDate     DateTime?
+  subscriptionExpiresAt   DateTime?
+  suspendedAt             DateTime?
+  suspendedReason         String?
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
