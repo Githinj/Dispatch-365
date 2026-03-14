@@ -189,10 +189,20 @@ model Agency {
   secondaryColor String?  @default("#16213e")
   footerText     String?
 
+  // Contact
+  contactEmail String?
+  contactPhone String?
+
   // Business
   commissionPercent Float            @default(10)
   paymentTermsDays  Int              @default(30)
   subscriptionPlan  SubscriptionPlan @default(FREE)
+
+  // Subscription lifecycle
+  subscriptionStartDate DateTime?
+  subscriptionEndDate   DateTime?
+  suspendedAt           DateTime?
+  suspendedReason       String?
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -234,6 +244,7 @@ model Fleet {
   inviteToken    String?  @unique
   invitedByAgencyId String?
   rejectionReason String?
+  approvedAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -627,10 +638,17 @@ model DispatcherRating {
   isFlagged  Boolean  @default(false)
   flagReason String?
 
+  // Super Admin moderation
+  isRemoved          Boolean   @default(false)
+  removedAt          DateTime?
+  removedByAdminId   String?
+  removalReason      String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([dispatcherId])
+  @@index([isFlagged])
 }
 
 // ── Driver module models ─────────────────────────────────────────────
@@ -724,4 +742,57 @@ model Notification {
   @@index([userId])
   @@index([userId, isRead])
   @@index([createdAt])
+}
+
+// ── Platform settings (singleton — one row) ─────────────────────────
+
+model PlatformSettings {
+  id                        String  @id @default(uuid())
+  platformName              String  @default("Dispatch-365")
+  platformLogoUrl           String?
+  primaryColor              String  @default("#0f3460")
+  secondaryColor            String  @default("#16213e")
+  supportEmail              String?
+  supportPhone              String?
+  platformWatermarkEnabled  Boolean @default(true)
+  watermarkText             String? @default("Powered by Dispatch-365")
+  poweredByText             String? @default("Powered by Dispatch-365")
+
+  // Reminder thresholds (days)
+  invoiceDueReminderDays      Int @default(3)
+  transferReminderDays        Int @default(7)
+  documentExpiryWarningDays   Int @default(30)
+  maintenanceReminderDays     Int @default(7)
+
+  // Cooldowns (days)
+  fleetReRequestCooldown    Int @default(30)
+  agencyReRequestCooldown   Int @default(30)
+  dispatcherJoinCooldown    Int @default(30)
+
+  // Subscription
+  trialPeriodDays     Int     @default(14)
+  gracePeriodDays     Int     @default(7)
+  autoSuspendOnExpiry Boolean @default(true)
+
+  // Session / security
+  webSessionTimeoutMinutes    Int @default(30)
+  mobileSessionTimeoutMinutes Int @default(60)
+  maxFailedLoginAttempts      Int @default(5)
+  loginLockoutMinutes         Int @default(15)
+
+  updatedAt DateTime @updatedAt
+}
+
+// ── Subscription plan configuration ────────────────────────────────
+
+model SubscriptionPlanConfig {
+  id               String           @id @default(uuid())
+  plan             SubscriptionPlan @unique
+  priceMonthly     Float            @default(0)
+  maxDispatchers   Int              @default(5)
+  maxLoadsPerMonth Int              @default(100)
+  features         String?          // JSON array of feature strings
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
