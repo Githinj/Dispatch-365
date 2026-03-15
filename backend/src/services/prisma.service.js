@@ -54,9 +54,11 @@ const prisma = {
   notification: {
     findUnique: async () => null,
     findMany: async () => [],
+    findFirst: async () => null,
     create: async (data) => data,
     update: async (data) => data,
     delete: async () => ({ id: "mock" }),
+    deleteMany: async () => ({ count: 0 }),
   },
   session: {
     findUnique: async () => null,
@@ -66,7 +68,58 @@ const prisma = {
     delete: async () => ({ id: "mock" }),
     deleteMany: async () => ({ count: 0 }),
   },
+  dispatcherTransferRequest: {
+    findUnique: async () => null,
+    findMany: async () => [],
+    create: async (data) => data,
+    update: async (data) => data,
+    delete: async () => ({ id: "mock" }),
+  },
+  driverTransferRequest: {
+    findUnique: async () => null,
+    findMany: async () => [],
+    create: async (data) => data,
+    update: async (data) => data,
+    delete: async () => ({ id: "mock" }),
+  },
+  platformSettings: {
+    findUnique: async () => null,
+    findMany: async () => [],
+    findFirst: async () => null,
+    create: async (data) => data,
+    update: async (data) => data,
+    delete: async () => ({ id: "mock" }),
+  },
+  auditLog: {
+    findUnique: async () => null,
+    findMany: async () => [],
+    create: async (data) => data,
+    update: async (data) => data,
+    delete: async () => ({ id: "mock" }),
+  },
 };
+
+// Add count method helper to all models
+function createModelMock() {
+  return {
+    findUnique: async () => null,
+    findMany: async () => [],
+    findFirst: async () => null,
+    create: async (data) => data,
+    update: async (data) => data,
+    updateMany: async (data) => ({ count: 0 }),
+    delete: async () => ({ id: "mock" }),
+    deleteMany: async () => ({ count: 0 }),
+    count: async () => 0,
+  };
+}
+
+// Enhance all existing models with count and updateMany methods
+Object.keys(prisma).forEach(key => {
+  if (key.startsWith("$")) return;
+  if (!prisma[key].count) prisma[key].count = async () => 0;
+  if (!prisma[key].updateMany) prisma[key].updateMany = async (data) => ({ count: 0 });
+});
 
 async function connectDatabase() {
   await prisma.$connect();
@@ -74,23 +127,6 @@ async function connectDatabase() {
 
 async function disconnectDatabase() {
   await prisma.$disconnect();
-}
-
-module.exports = { prisma, connectDatabase, disconnectDatabase };
-
-async function connectDatabase() {
-  try {
-    await prisma.$connect();
-    console.log("[Prisma] Connected to database");
-  } catch (error) {
-    console.error("[Prisma] Connection failed:", error.message);
-    process.exit(1);
-  }
-}
-
-async function disconnectDatabase() {
-  await prisma.$disconnect();
-  console.log("[Prisma] Disconnected from database");
 }
 
 module.exports = { prisma, connectDatabase, disconnectDatabase };
